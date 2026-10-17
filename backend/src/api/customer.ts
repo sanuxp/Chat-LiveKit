@@ -2,10 +2,11 @@ import { randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import jwt from "jsonwebtoken";
 import { config } from "../config.js";
-import { resolveProfile, mergeProfile, profileFromClaims, profileFromHeaders, storedFromRow, sameProfile, type ProvidedProfile } from "../customer/profile.js";
+import { isDifferentPerson, resolveProfile, mergeProfile, profileFromClaims, profileFromHeaders, storedFromRow, sameProfile, type ProvidedProfile } from "../customer/profile.js";
 import { pool } from "../db/db.js";
 import { customerIdentity, deleteRoom, mintToken, publish } from "../realtime/livekit.js";
 import { clearFallback } from "../routing/handoff.js";
+import { closeExpired } from "../session/expiry.js";
 import { httpError, requireCustomer, signToken } from "./auth.js";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -59,11 +60,20 @@ export async function customerRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.post("/api/customer/session", async (req) => {
-    const { externalRef, visitorId, provided } = resolveIdentity(req);
+    const identity = resolveIdentity(req);
+    const { provided } = identity;
+    let { externalRef, visitorId } = identity;
 
     // customer row (stable per external_ref)
     const COLS = "id, name, email, phone, metadata";
     let customer = (await pool.query(`SELECT ${COLS} FROM customers WHERE external_ref=$1`, [externalRef])).rows[0];
+    if (customer && config.customerAuthMode === "anonymous" && isDifferentPerson(storedFromRow(customer), provided)) {
+      // Someone else is using this browser (the host page now sends a different user, or none): never show them the
+      // previous person's chat. Give them a new visitor id; the widget stores the one we return.
+      visitorId = randomUUID();
+      externalRef = `anon:${visitorId}`;
+      customer = undefined;
+    }
     if (!customer) {
       customer = (
         await pool.query(
@@ -88,15 +98,20 @@ export async function customerRoutes(app: FastifyInstance): Promise<void> {
     // open conversation or create a new one
     let conv = (
       await pool.query(
-        `SELECT id, status FROM conversations
+        `SELECT id, status, expires_at, (expires_at IS NOT NULL AND expires_at <= now()) AS due FROM conversations
           WHERE customer_id=$1 AND deleted_at IS NULL AND status <> 'closed'
           ORDER BY created_at DESC LIMIT 1`,
         [customer.id],
       )
     ).rows[0];
+    // 24 h window over: close it (transcript kept) and start fresh. With a person (waiting/assigned) it finishes first.
+    if (conv?.due && (conv.status === "ai" || conv.status === "escalated_external")) {
+      await closeExpired(conv.id);
+      conv = undefined;
+    }
     if (!conv) {
       conv = (
-        await pool.query("INSERT INTO conversations (id, customer_id) VALUES ($1,$2) RETURNING id, status", [randomUUID(), customer.id])
+        await pool.query("INSERT INTO conversations (id, customer_id) VALUES ($1,$2) RETURNING id, status, expires_at", [randomUUID(), customer.id])
       ).rows[0];
     }
 
@@ -107,6 +122,8 @@ export async function customerRoutes(app: FastifyInstance): Promise<void> {
       visitorId,
       conversationId: conv.id,
       status: conv.status,
+      expiresAt: conv.expires_at ?? null, // set by the customer's first message, then fixed
+
       livekitUrl: config.livekitPublicUrl,
       livekitToken,
       backendToken: signToken({ role: "customer", sub: customer.id, conv: conv.id }),
