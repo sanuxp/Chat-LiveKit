@@ -1,6 +1,7 @@
 import { startApi } from "./api/server.js";
 import { initDb } from "./db/db.js";
 import { resumeWaiting } from "./routing/startup.js";
+import { startSessionSweeper } from "./session/expiry.js";
 import { loadTools, ToolConfigError, watchConfig } from "./tools/registry.js";
 
 async function main() {
@@ -8,6 +9,7 @@ async function main() {
   await loadTools(); // refuses to start (clear message) if tools.yaml is invalid
   watchConfig();
   await startApi();
+  startSessionSweeper();
   await resumeWaiting().catch((e) => console.error("resumeWaiting failed:", e?.message));
   console.log("backend ready");
 }

@@ -78,6 +78,16 @@ Identical to the Matrix version, plus an optional `calls` switch:
 
 The customer details headers (`X-Customer-Name/Email/Phone/Meta`), validation limits, defaults, and `CUSTOMER_AUTH_MODE=external_jwt` behave exactly as described in the Matrix project's README.
 
+## Sessions (resume, expiry, privacy)
+
+A visitor who comes back is put in the same conversation, with the transcript, for **24 hours counted from their first message** (`SESSION_TTL_HOURS`; fixed, later messages do not extend it). After that the conversation is **closed** (its transcript stays in the database) and the next visit starts a fresh one.
+
+- **Transcript:** every message is written to Postgres as it happens (typed, spoken, AI, agent), so nothing is lost if the browser or the server goes away. Closed conversations keep their transcript until `TRANSCRIPT_RETENTION_DAYS` (0 = keep).
+- **Who owns a session:** with `CUSTOMER_AUTH_MODE=external_jwt` (recommended) the session belongs to the verified user (`sub` of the JWT your site signs). The same user gets it back from any device or browser; nobody else can ever read or write it, whatever browser they use. With `anonymous` mode the session belongs to the browser (a visitor id in localStorage) and nothing is verified, so it is best effort: if the host page starts sending a different user (different email, name or phone), or no user at all (logged out), the widget starts a separate chat and the previous one stays hidden; it is not offered again to the previous user on that browser.
+- **Changing user without a page reload** (single-page app): call `SupportChat.identify({ authToken, user, metadata })` after login or account switch. A different user drops the old chat and starts a new session; a refreshed token of the same user changes nothing. On logout call `SupportChat.destroy()` and `SupportChat.init(...)` again after the next login.
+- **Human agents:** a conversation that is waiting for or being handled by an agent is never cut off at 24 hours. It closes as soon as the agent resolves it (or the wait ends), instead of going back to the AI.
+- **Expiry notice:** a customer who still has the chat open sees "This conversation has ended because its time limit was reached" and a button to start a new one.
+
 ## Voice and video
 
 **Works today (human <-> customer):** set `ENABLE_VOICE=true` and/or `ENABLE_VIDEO=true` in `.env` and restart the backend. Tokens then allow publishing microphone/camera; the widget shows 🎤/📷 buttons and the agent console shows 🎤/📷 buttons plus the customer's video. Tested with fake media devices (`scripts/call-e2e.mjs`).
@@ -105,4 +115,6 @@ node scripts/mock-llm.mjs &        # fake LLM
 docker compose -f docker-compose.yml -f docker-compose.mock-llm.yml up -d backend
 npm run e2e:ui                     # chat, AI streaming, escalation, hand-off, reload (needs Edge + agent alice)
 node scripts/call-e2e.mjs          # voice/video tracks (needs ENABLE_VOICE/VIDEO=true)
+node scripts/session-test.mjs      # session rules via the API: resume, privacy, 24 h expiry (restarts the backend with a 14 s lifetime, then restores it)
+node scripts/session-ui-e2e.mjs    # widget: reload resumes, another user never sees it, SupportChat.identify()
 ```

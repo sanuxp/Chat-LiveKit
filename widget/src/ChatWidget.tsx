@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createSession, deleteConversation, type CustomerInfo, type CustomerMetadata, type Session } from "./api";
+import { identityKey } from "./identity";
 import { CameraIcon, ChatIcon, CloseIcon, MicIcon, SendIcon, TrashIcon } from "./icons";
 import { TrackVideo } from "./TrackVideo";
 import { Typewriter } from "./Typewriter";
@@ -38,20 +39,36 @@ export function ChatWidget({ opts }: { opts: WidgetOptions }) {
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const connecting = useRef(false);
+  const generation = useRef(0); // bumped when the user changes, so a late response for the old user is ignored
   const dark = useDark(opts.theme);
 
   const start = useCallback(async () => {
     if (connecting.current) return;
     connecting.current = true;
+    const mine = generation.current;
     setError(null);
     try {
-      setSession(await createSession(opts.backendUrl, opts.authToken ?? null, { user: opts.user, metadata: opts.metadata, customHeaders: opts.customHeaders }));
+      const next = await createSession(opts.backendUrl, opts.authToken ?? null, { user: opts.user, metadata: opts.metadata, customHeaders: opts.customHeaders });
+      if (mine === generation.current) setSession(next);
     } catch {
-      setError("Could not connect to support. Please try again.");
+      if (mine === generation.current) setError("Could not connect to support. Please try again.");
     } finally {
-      connecting.current = false;
+      if (mine === generation.current) connecting.current = false;
     }
   }, [opts]);
+
+  // another user logged in (or the user logged out): forget the current chat completely, then connect for the new user
+  const who = identityKey(opts);
+  const previousWho = useRef(who);
+  useEffect(() => {
+    if (previousWho.current === who) return;
+    previousWho.current = who;
+    generation.current += 1;
+    connecting.current = false;
+    setSession(null);
+    setError(null);
+    setConfirmDelete(false);
+  }, [who]);
 
   // connect lazily on first open
   useEffect(() => { if (open) setEverOpened(true); }, [open]);
