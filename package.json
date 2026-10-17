@@ -1,0 +1,12 @@
+{
+  "name": "support-chat-livekit",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "mock-llm": "node scripts/mock-llm.mjs",
+    "e2e:ui": "node scripts/ui-e2e.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.50.0"
+  }
+}

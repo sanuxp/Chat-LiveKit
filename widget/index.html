@@ -1,0 +1,21 @@
+<!doctype html>
+<!-- Dev host page (vite dev). The production demo page is public/index.html. -->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Support chat — dev host page</title>
+  </head>
+  <body>
+    <h1>Acme demo site (dev)</h1>
+    <p>The chat bubble is at the bottom right. Backend and LiveKit are reached via Caddy on :8080.</p>
+    <script type="module" src="/src/embed.ts"></script>
+    <script type="module">
+      window.SupportChat.init({
+        backendUrl: "http://localhost:8080",
+        authToken: null,
+        user: { name: "Dev User", email: "dev.user@example.com", phone: "+919800000000" }, // all optional
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,72 @@
+name: support-chat-livekit
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: support
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: support
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U support -d support"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Self-hosted LiveKit. To use LiveKit Cloud instead, delete this service and the /livekit route in the
+  # Caddyfile, and point LIVEKIT_URL / LIVEKIT_PUBLIC_URL / LIVEKIT_API_KEY / LIVEKIT_API_SECRET at your project.
+  livekit:
+    image: livekit/livekit-server:latest
+    restart: unless-stopped
+    command: --config /etc/livekit.yaml
+    environment:
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
+    volumes:
+      - ./livekit/livekit.yaml:/etc/livekit.yaml:ro
+    ports:
+      - "127.0.0.1:7880:7880"   # signalling (direct access; browsers normally go through Caddy /livekit)
+      - "7881:7881"             # ICE/TCP
+      - "7882:7882/udp"         # ICE/UDP
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      livekit:
+        condition: service_started
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://support:${POSTGRES_PASSWORD}@postgres:5432/support
+      LIVEKIT_URL: http://livekit:7880
+    volumes:
+      - ./backend/config:/app/config
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-3000}:${BACKEND_PORT:-3000}"
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on: [backend, livekit]
+    environment:
+      BACKEND_PORT: ${BACKEND_PORT:-3000}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./widget/dist:/srv/widget:ro
+      - ./agent-ui/dist:/srv/agent-ui:ro
+    ports:
+      - "8080:8080"
+
+  mailpit:
+    image: axllent/mailpit
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8025:8025"   # web inbox
+      - "127.0.0.1:1025:1025"   # SMTP
+
+volumes:
+  pgdata:

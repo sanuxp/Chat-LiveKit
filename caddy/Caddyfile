@@ -1,0 +1,24 @@
+# Local dev. To use a real domain: replace ":8080" with "chat.example.com" (Caddy gets TLS automatically),
+# remove "auto_https off", and set LIVEKIT_PUBLIC_URL=wss://chat.example.com/livekit
+{
+	auto_https off
+}
+
+:8080 {
+	handle /api/* {
+		reverse_proxy backend:{$BACKEND_PORT}
+	}
+	# LiveKit signalling (websocket). Browsers connect to ws://host:8080/livekit  ->  livekit:7880/rtc
+	handle_path /livekit/* {
+		reverse_proxy livekit:7880
+	}
+	handle_path /agent/* {
+		root * /srv/agent-ui
+		try_files {path} /index.html
+		file_server
+	}
+	handle {
+		root * /srv/widget
+		file_server
+	}
+}

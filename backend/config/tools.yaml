@@ -1,0 +1,84 @@
+# Tools and escalation paths the AI can use. Edit this file (and prompts/*.md), then either restart the
+# backend or call POST /api/admin/reload-config. No code changes needed.
+#
+# ${VAR}   in `options` is replaced from environment variables (only for enabled tools).
+# {{field}} in templates is replaced from tool arguments + context (conversation_id, customer_ref, transcript, ...)
+#          and the customer profile sent by the host web page: {{customer_name}}, {{customer_email}},
+#          {{customer_phone}}, {{customer_meta}}, {{meta_<key>}} (defaults: Test User / testuser@test.com / +9876543210).
+#          A tool argument with the same name wins (e.g. the confirmed `customer_email`).
+# `after`: pause_ai | continue_ai | close   (applied by the core, not the handler)
+
+max_tool_rounds: 3
+
+tools:
+  - name: escalate_to_human_chat
+    enabled: true
+    handler: human_chat
+    description: >
+      Hand the conversation to a live human support agent in this same chat.
+    prompt_file: prompts/escalate_human_chat.md
+    parameters:
+      type: object
+      properties:
+        reason: { type: string, description: Why a human is needed. }
+        summary: { type: string, description: Short summary of the conversation for the human agent. }
+      required: [reason, summary]
+    after: pause_ai
+    customer_message: "I'm connecting you with a member of our team. They'll join this chat shortly."
+    options:
+      fallback_tool: escalate_via_email
+      fallback_after_seconds: 300
+
+  - name: escalate_via_email
+    enabled: true
+    handler: email
+    description: >
+      Escalate the issue to the support team by email when live chat is not suitable
+      or no agent is available. Ask the customer for their email address first.
+    prompt_file: prompts/escalate_email.md
+    parameters:
+      type: object
+      properties:
+        customer_email: { type: string, format: email }
+        reason: { type: string }
+        summary: { type: string }
+      required: [customer_email, reason, summary]
+    after: continue_ai
+    customer_message: "Thanks, I've passed this to our support team. They'll reply to {{customer_email}}."
+    options:
+      to: ["${SUPPORT_EMAIL_TO}"]               # from .env
+      subject_template: "[Chat escalation] {{reason}}"
+      body_template_file: prompts/email_body.md   # placeholders: {{summary}}, {{reason}}, {{customer_email}}, {{conversation_id}}, {{transcript}}
+      include_transcript: true
+
+  - name: create_ticket
+    enabled: false
+    handler: webhook
+    description: Create a support ticket in the ticketing system.
+    parameters:
+      type: object
+      properties:
+        title: { type: string }
+        priority: { type: string, enum: [low, normal, high] }
+        summary: { type: string }
+      required: [title, summary]
+    after: continue_ai
+    options:
+      url: "https://tickets.internal/api/tickets"
+      method: POST
+      headers: { Authorization: "Bearer ${TICKETS_API_TOKEN}" }
+      timeout_ms: 10000
+      include_transcript: false
+      return_response_to_llm: true      # the LLM sees the webhook response (e.g. ticket id)
+
+  - name: lookup_order
+    enabled: false
+    handler: custom
+    module: example                     # loads src/tools/custom/example.ts
+    description: Look up an order's status by order number.
+    parameters:
+      type: object
+      properties:
+        order_number: { type: string }
+      required: [order_number]
+    after: continue_ai

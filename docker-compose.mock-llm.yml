@@ -1,0 +1,9 @@
+# Test override: run the backend against scripts/mock-llm.mjs instead of the LLM in .env.
+#   node scripts/mock-llm.mjs &
+#   docker compose -f docker-compose.yml -f docker-compose.mock-llm.yml up -d backend
+# Go back to the real LLM with: docker compose up -d backend
+services:
+  backend:
+    environment:
+      LLM_BASE_URL: http://host.docker.internal:4000
+      LLM_API_KEY: mock

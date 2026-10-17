@@ -1,0 +1,8 @@
+# LiveKit server config (self-hosted). API key/secret come from the LIVEKIT_KEYS env var (see docker-compose.yml).
+port: 7880
+rtc:
+  tcp_port: 7881        # ICE/TCP fallback: works through Docker Desktop and most firewalls
+  udp_port: 7882        # single UDP mux port (simpler than a port range)
+  node_ip: 127.0.0.1    # LOCAL DEV ONLY. In production set this to the server's public IP (needed for voice/video).
+logging:
+  level: info
