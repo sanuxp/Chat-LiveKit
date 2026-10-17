@@ -1,0 +1,256 @@
+# Voice pipeline catalog: what an admin can pick in Agent console -> Voice settings.
+# Mirrors the stack of AXLAI voicekit (provider ids, VAD / noise / turn-detection choices, models, languages, voices),
+# plus "openai-compatible" so the LiteLLM proxy used by the text chat works with no extra key.
+#
+# The worker (voice-agent/src/factories.py) builds the chosen provider; ids here must match it.
+#   env:           variables the provider needs (backend and worker read the same .env). Missing ones are shown as a
+#                  warning in the console and the worker refuses to build that provider.
+#   env_any:       at least one of these groups must be fully set (e.g. Azure speech: region OR endpoint).
+#   requires_vad:  the provider only works next to a local VAD.
+#   custom_model / custom_voice: the console also accepts a free-text value (deployment names, voice ids, ...).
+#   tunables:      numeric fields (see `fields`) the console shows for that provider.
+
+defaults:
+  enabled: true
+  greeting: "Hi! How can I help you today?"
+  vad_provider: silero
+  noise_provider: none
+  turn_detection: multilingual
+  stt_provider: openai-compatible
+  stt_model: whisper-1
+  stt_language: en
+  llm_provider: openai-compatible
+  llm_model: gpt-4.1-mini
+  tts_provider: openai-compatible
+  tts_model: gpt-4o-mini-tts
+  tts_voice_id: alloy
+  tts_language: en
+
+# Numeric fields: label, range and default. A provider lists which of them apply in `tunables`.
+fields:
+  vad_activation_threshold: { label: Speech threshold, min: 0.1, max: 0.95, step: 0.05, default: 0.5, help: "Higher = needs clearer speech (good for noisy lines)." }
+  vad_min_silence_duration: { label: Min silence (s), min: 0.1, max: 2, step: 0.05, default: 0.55, help: Silence after speech before the turn can end. }
+  vad_min_speech_duration: { label: Min speech (s), min: 0.0, max: 1, step: 0.05, default: 0.3, help: "Ignores shorter blips and coughs." }
+  vad_prefix_padding_duration: { label: Prefix padding (s), min: 0.0, max: 1, step: 0.1, default: 0.5, help: Audio kept before speech starts so first words are not clipped. }
+  min_interruption_words: { label: Words to interrupt, min: 0, max: 6, step: 1, default: 2, integer: true, help: Words the caller must say to interrupt the assistant. }
+  noise_strength: { label: Suppression strength, min: 0, max: 1, step: 0.1, default: 0.5, help: "0 = off, 1 = maximum." }
+  min_endpointing_delay: { label: Min delay before answering (s), min: 0, max: 3, step: 0.1, default: 0.5 }
+  max_endpointing_delay: { label: Max wait for a turn to end (s), min: 0.5, max: 10, step: 0.5, default: 3.0 }
+  stt_endpointing_ms: { label: Deepgram endpointing (ms), min: 10, max: 2000, step: 10, default: 25, integer: true, help: Silence before Deepgram finalises an utterance. }
+  stt_eot_threshold: { label: End-of-turn confidence, min: 0.5, max: 0.9, step: 0.05, default: 0.7, help: Higher = fewer false turn-ends, more latency. }
+  stt_eot_timeout_ms: { label: End-of-turn timeout (ms), min: 500, max: 10000, step: 100, default: 3000, integer: true }
+  temperature: { label: Temperature, min: 0, max: 1.5, step: 0.1, default: 0.3 }
+  max_tokens: { label: Max answer tokens, min: 50, max: 2000, step: 50, default: 300, integer: true, help: Keep it low so spoken answers stay short. }
+  speech_speed: { label: Speech speed, min: 0.7, max: 1.3, step: 0.05, default: 1.0 }
+
+# Quick-fill values for the VAD tuning fields (applied by the console, stored as plain values).
+vad_presets:
+  balanced: { label: Balanced, values: { vad_activation_threshold: 0.5, vad_min_silence_duration: 0.55, vad_min_speech_duration: 0.3 } }
+  sensitive: { label: Sensitive (quiet speakers, faster turns), values: { vad_activation_threshold: 0.35, vad_min_silence_duration: 0.4, vad_min_speech_duration: 0.1 } }
+  noisy: { label: Noise robust (noisy places), values: { vad_activation_threshold: 0.65, vad_min_silence_duration: 0.7, vad_min_speech_duration: 0.4 } }
+
+vad:
+  silero:
+    label: Silero
+    description: Self-contained local VAD (default).
+    tunables: [vad_activation_threshold, vad_min_silence_duration, vad_min_speech_duration, vad_prefix_padding_duration, min_interruption_words]
+  ai-coustics:
+    label: ai-coustics
+    description: ai-coustics VAD model. Needs AIC_SDK_LICENSE; the worker falls back to Silero if it can't start.
+    env: [AIC_SDK_LICENSE]
+    tunables: [vad_prefix_padding_duration, min_interruption_words]
+  none:
+    label: None (rely on the STT provider)
+    description: No local VAD. Needs "STT end-of-turn"; interruptions are less reliable.
+    tunables: []
+
+noise_cancellation:
+  none:
+    label: Off
+    tunables: []
+  dtln:
+    label: DTLN (self-hosted, free)
+    description: Runs in the worker process. Good for telephony and noisy rooms; adds a little CPU.
+    tunables: [noise_strength]
+  ai-coustics:
+    label: ai-coustics (licensed)
+    description: Needs AIC_SDK_LICENSE.
+    env: [AIC_SDK_LICENSE]
+    tunables: []
+
+turn_detection:
+  multilingual:
+    label: LiveKit turn detector - multilingual
+    description: Semantic end-of-turn model for many languages (default). Needs a VAD.
+    requires_vad: true
+  english:
+    label: LiveKit turn detector - English
+    description: Smaller, faster English-only model. Needs a VAD.
+    requires_vad: true
+  cue:
+    label: Pype cue-v1 (llama.cpp server)
+    description: LLM-based end-of-turn model served by llama.cpp. Needs CUE_SERVER_URL (default http://localhost:8090) and a VAD.
+    requires_vad: true
+    env: [CUE_SERVER_URL]
+  stt:
+    label: STT end-of-turn
+    description: Uses the STT provider's own end-of-turn signal. Only with Deepgram Flux.
+    requires_vad: false
+  vad:
+    label: VAD only (silence based)
+    description: Ends the turn after silence. Lowest latency, but cuts people off mid-sentence more often.
+    requires_vad: true
+
+stt:
+  openai-compatible:
+    label: OpenAI-compatible (LiteLLM proxy)
+    description: Uses LLM_BASE_URL / LLM_API_KEY, so a LiteLLM proxy with a transcription model needs no extra key.
+    env: [LLM_BASE_URL, LLM_API_KEY]
+    requires_vad: true
+    custom_model: true
+    tunables: []
+    models:
+      whisper-1: { languages: [en, hi, multi] }
+  deepgram:
+    label: Deepgram
+    env: [DEEPGRAM_API_KEY]
+    tunables: [stt_endpointing_ms]
+    models:
+      nova-3: { languages: [en, en-US, en-IN, hi, multi] }
+      nova-2: { languages: [en, en-US, en-IN, hi] }
+  deepgram-flux:
+    label: Deepgram Flux
+    description: Streaming model with built-in end-of-turn detection. Pair with "STT end-of-turn".
+    env: [DEEPGRAM_API_KEY]
+    tunables: [stt_eot_threshold, stt_eot_timeout_ms]
+    models:
+      flux-general-en: { languages: [en] }
+      flux-general-multi: { languages: [multi] }
+  azure:
+    label: Azure Speech
+    env: [AZURE_SPEECH_API_KEY]
+    env_any: [[AZURE_SPEECH_REGION], [AZURE_SPEECH_ENDPOINT]]
+    tunables: []
+    models:
+      azure-stt: { languages: [en-US, en-IN, hi-IN, es-ES, fr-FR, de-DE] }
+  azure-openai:
+    label: Azure OpenAI transcription
+    description: The model field is your Azure deployment name.
+    env: [AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY]
+    requires_vad: true
+    custom_model: true
+    tunables: []
+    models:
+      gpt-4o-transcribe: { languages: [en, hi, multi] }
+      gpt-4o-mini-transcribe: { languages: [en, hi, multi] }
+      whisper: { languages: [en, hi, multi] }
+
+llm:
+  openai-compatible:
+    label: OpenAI-compatible (LiteLLM proxy)
+    description: Same endpoint as the text chat (LLM_BASE_URL, LLM_API_KEY). Type any model name your proxy serves.
+    env: [LLM_BASE_URL, LLM_API_KEY]
+    custom_model: true
+    tunables: [temperature, max_tokens]
+    models: [gpt-4.1-mini, gpt-4.1, gpt-4o-mini, gpt-4o]
+  openai:
+    label: OpenAI
+    env: [OPENAI_API_KEY]
+    tunables: [temperature, max_tokens]
+    models: [gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, gpt-4o, gpt-4o-mini]
+  azure-openai:
+    label: Azure OpenAI
+    description: The model field is your Azure deployment name. API version from AZURE_OPENAI_API_VERSION (default 2025-01-01-preview).
+    env: [AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY]
+    custom_model: true
+    tunables: [temperature, max_tokens]
+    models: [gpt-4o, gpt-4o-mini, gpt-4.1-mini]
+
+tts:
+  openai-compatible:
+    label: OpenAI-compatible (LiteLLM proxy)
+    description: Uses LLM_BASE_URL / LLM_API_KEY, so a LiteLLM proxy with a speech model needs no extra key.
+    env: [LLM_BASE_URL, LLM_API_KEY]
+    custom_model: true
+    tunables: [speech_speed]
+    models:
+      gpt-4o-mini-tts: { voices: &openai_voices [alloy, ash, ballad, coral, echo, fable, nova, onyx, sage, shimmer] }
+      tts-1: { voices: *openai_voices }
+  openai:
+    label: OpenAI
+    env: [OPENAI_API_KEY]
+    tunables: [speech_speed]
+    models:
+      gpt-4o-mini-tts: { voices: *openai_voices }
+      tts-1: { voices: *openai_voices }
+      tts-1-hd: { voices: *openai_voices }
+  azure-openai:
+    label: Azure OpenAI TTS
+    description: The model field is your Azure deployment name.
+    env: [AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY]
+    custom_model: true
+    tunables: [speech_speed]
+    models:
+      gpt-4o-mini-tts: { voices: *openai_voices }
+  11labs:
+    label: ElevenLabs
+    description: Pick a voice or paste any voice id from your ElevenLabs library.
+    env: [ELEVENLABS_API_KEY]
+    custom_voice: true
+    tunables: [speech_speed]
+    models:
+      eleven_turbo_v2_5: { voices: &eleven_voices [bIHbv24MWmeRgasZH58o, EXAVITQu4vr4xnSDxMaL, 21m00Tcm4TlvDq8ikWAM] }
+      eleven_flash_v2_5: { voices: *eleven_voices }
+      eleven_multilingual_v2: { voices: *eleven_voices }
+  azure:
+    label: Azure Speech
+    env: [AZURE_SPEECH_API_KEY]
+    env_any: [[AZURE_SPEECH_REGION], [AZURE_SPEECH_ENDPOINT]]
+    custom_voice: true
+    tunables: []
+    models:
+      azure-tts:
+        languages: [en-US, en-IN, hi-IN]
+        voices: [en-US-JennyNeural, en-US-GuyNeural, en-IN-NeerjaNeural, hi-IN-SwaraNeural]
+  cartesia:
+    label: Cartesia Sonic
+    env: [CARTESIA_API_KEY]
+    custom_voice: true
+    tunables: []
+    models:
+      sonic-3:
+        languages: [en, hi, es, fr, de]
+        voices: [f786b574-daa5-4673-aa0c-cbe3e8534c02]
+  neuphonic:
+    label: Neuphonic
+    env: [NEUPHONIC_API_KEY]
+    custom_voice: true
+    tunables: [speech_speed]
+    models:
+      neuphonic-default: { voices: [8e9c4bc8-3979-48ab-8626-df53befc2090] }
+  murf:
+    label: Murf
+    env: [MURF_API_KEY]
+    custom_voice: true
+    tunables: []
+    models:
+      FALCON:
+        languages: [en-US, en-IN, hi-IN, th-TH]
+        voices: [en-US-matthew, en-US-natalie, en-IN-eashwar]
+  gemini:
+    label: Google Gemini TTS
+    env: [GOOGLE_API_KEY]
+    tunables: []
+    models:
+      gemini-3.1-flash-tts-preview: { voices: &gemini_voices [Kore, Puck, Charon, Aoede, Fenrir, Leda, Zephyr] }
+      gemini-2.5-flash-preview-tts: { voices: *gemini_voices }
+  google:
+    label: Google Cloud TTS
+    description: GOOGLE_APPLICATION_CREDENTIALS may be the service-account JSON itself or a path to the file.
+    env: [GOOGLE_APPLICATION_CREDENTIALS]
+    custom_voice: true
+    tunables: [speech_speed]
+    models:
+      chirp-3-hd:
+        languages: [en-US, en-IN, hi-IN]
+        voices: [en-US-Chirp3-HD-Charon, en-US-Chirp3-HD-Aoede, en-IN-Chirp3-HD-Kore]

@@ -62,3 +62,22 @@ main { flex: 1; padding: 18px; max-width: 980px; width: 100%; margin: 0 auto; }
 .summary-title { color: #b45309; font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 2px; }
 .summary-reason { color: #6b7686; margin-top: 4px; }
 .preview-note { padding: 10px 14px; border-top: 1px solid #e3e8f0; color: #6b7686; text-align: center; background: #fff; }
+
+/* voice settings */
+.vs { display: grid; gap: 14px; }
+.vs-head { display: flex; gap: 12px; align-items: center; }
+.vs-head h2 { margin: 0; font-size: 18px; }
+.vs-card { background: #fff; border: 1px solid #e3e8f0; border-radius: 12px; padding: 14px 16px; }
+.vs-card h3 { margin: 0 0 10px; font-size: 15px; color: #2563eb; }
+.vs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; align-items: start; }
+.vs-field { display: grid; gap: 4px; font-weight: 600; font-size: 13px; }
+.vs-field select, .vs-field input[type=text], .vs-field input:not([type]), .vs-field input[list], .vs-field input[type=number] { width: 100%; }
+.vs-field select { border: 1px solid #cfd6e3; border-radius: 8px; padding: 9px 11px; font: inherit; background: #fff; }
+.vs-hint { font-weight: 400; color: #6b7686; }
+.vs-num { display: grid; grid-template-columns: 1fr 90px; gap: 8px; align-items: center; }
+.vs-num input[type=range] { padding: 0; border: 0; }
+.vs-check { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; font-weight: 600; }
+.vs-check input { width: auto; }
+.vs-issue { margin: 8px 0 0; font-size: 13px; }
+.vs-warn { color: #b45309; }
+.vs-saved { color: #16a34a; margin: 0; }

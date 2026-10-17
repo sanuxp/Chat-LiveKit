@@ -1,0 +1,41 @@
+[project]
+name = "support-voice-agent"
+version = "0.1.0"
+description = "LiveKit Agents worker: AI voice assistant for the support chat (selectable VAD, turn detection, STT, LLM, TTS)"
+requires-python = ">=3.12"
+# Versions follow AXLAI voicekit (axlai-voicekit/pyproject.toml) so both stacks behave the same.
+dependencies = [
+    "livekit-agents[cartesia]==1.6.10",
+    "livekit-plugins-openai==1.6.10",
+    "livekit-plugins-deepgram==1.6.10",
+    "livekit-plugins-azure==1.6.10",
+    "livekit-plugins-elevenlabs==1.6.10",
+    "livekit-plugins-silero==1.6.10",
+    "livekit-plugins-turn-detector==1.6.10",
+    "livekit-plugins-neuphonic==1.6.10",
+    "livekit-plugins-google==1.6.10",
+    "livekit-plugins-dtln>=0.1.5",
+    "livekit-murf>=0.1.1",
+    # ai-coustics VAD / noise suppression (optional at runtime: the worker skips it if there is no AIC_SDK_LICENSE)
+    "ai-coustics-livekit-plugin>=0.1.0",
+    "opentelemetry-sdk==1.39.1",
+    "anyio==4.14.2",
+    "httpx>=0.27",
+    "python-dotenv>=1.2.2,<2",
+    "urllib3==2.8.0",
+    "multidict==6.9.1",
+]
+
+[tool.uv]
+# transformers: CVE-2026-4372 (RCE) fixed in 5.3.0; pulled in by livekit-plugins-turn-detector with no upper bound
+constraint-dependencies = ["transformers>=5.5.0", "aiohttp>=3.14.3", "cryptography>=50.0.0"]
+override-dependencies = ["json-repair>=0.60.1"]
+
+[[tool.uv.index]]
+name = "pytorch_cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch_cpu" }
+torchaudio = { index = "pytorch_cpu" }

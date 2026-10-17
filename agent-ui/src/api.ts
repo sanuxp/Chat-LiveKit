@@ -15,7 +15,7 @@ export const saveSession = (s: Session | null) => {
 };
 
 export class ApiError extends Error {
-  constructor(message: string, readonly status: number) { super(message); }
+  constructor(message: string, readonly status: number, readonly body: any = null) { super(message); }
 }
 
 export async function api<T = any>(token: string | null, method: string, path: string, body?: unknown): Promise<T> {
@@ -25,7 +25,7 @@ export async function api<T = any>(token: string | null, method: string, path: s
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ApiError((data as any).message ?? `request failed (${res.status})`, res.status);
+  if (!res.ok) throw new ApiError((data as any).message ?? `request failed (${res.status})`, res.status, data);
   return data as T;
 }
 

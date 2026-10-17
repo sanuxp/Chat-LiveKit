@@ -47,3 +47,10 @@ CREATE TABLE IF NOT EXISTS messages (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS messages_conv_seq ON messages (conversation_id, seq);
+
+-- small key/value store for admin settings (e.g. the selected voice pipeline, key "voice")
+CREATE TABLE IF NOT EXISTS settings (
+  key text PRIMARY KEY,
+  value jsonb NOT NULL,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);

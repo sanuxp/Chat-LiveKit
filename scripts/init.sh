@@ -11,7 +11,7 @@ fill() { # fill <KEY> <value>: only when the key is empty in .env
     echo "generated $1"
   fi
 }
-for key in POSTGRES_PASSWORD BACKEND_JWT_SECRET ADMIN_API_TOKEN WEBHOOK_SIGNING_SECRET LIVEKIT_API_SECRET; do
+for key in POSTGRES_PASSWORD BACKEND_JWT_SECRET ADMIN_API_TOKEN WEBHOOK_SIGNING_SECRET LIVEKIT_API_SECRET INTERNAL_API_TOKEN; do
   fill "$key" "$(openssl rand -hex 32)"
 done
 fill LIVEKIT_API_KEY "API$(openssl rand -hex 6)"

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ConversationView } from "./ConversationView";
 import { Login } from "./Login";
+import { VoiceSettings } from "./VoiceSettings";
 import { Queue, type ConversationRow } from "./Queue";
 import { ApiError, api, loadSession, login, saveSession, type Session } from "./api";
 
@@ -13,6 +14,7 @@ export function App() {
   const [online, setOnline] = useState(false);
   const [rows, setRows] = useState<ConversationRow[]>([]);
   const [open, setOpen] = useState<string | null>(null);
+  const [view, setView] = useState<"queue" | "voice">("queue");
   // conversations this agent declined: hidden from their Waiting list (still waiting for everyone else)
   const [declined, setDeclined] = useState<Set<string>>(() => {
     try { return new Set(JSON.parse(sessionStorage.getItem("supportchat.declined") ?? "[]")); } catch { return new Set(); }
@@ -95,11 +97,16 @@ export function App() {
         <button className={online ? "online" : "secondary"} onClick={toggleOnline}>
           <span className={`dot ${online ? "on" : ""}`} /> {online ? "Online" : "Offline"}
         </button>
+        <button className="secondary" onClick={() => { setOpen(null); setView(view === "voice" ? "queue" : "voice"); }}>
+          {view === "voice" ? "Queue" : "Voice settings"}
+        </button>
         <button className="secondary" onClick={() => void signOut()}>Sign out</button>
       </header>
       {error && <p className="error banner" onClick={() => setError(null)}>{error}</p>}
       <main>
-        {open ? (
+        {view === "voice" ? (
+          <VoiceSettings token={token} onClose={() => setView("queue")} />
+        ) : open ? (
           <ConversationView token={token} conversationId={open} online={online} onDecline={() => decline(open)} onClose={() => { setOpen(null); void refresh(); }} />
         ) : (
           <Queue rows={rows} declined={declined} canTake={online} onOpen={(id) => setOpen(id)} />

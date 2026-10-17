@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import { config } from "../config.js";
 import { resolveProfile, mergeProfile, profileFromClaims, profileFromHeaders, storedFromRow, sameProfile, type ProvidedProfile } from "../customer/profile.js";
 import { pool } from "../db/db.js";
+import { getSelection } from "../voice/catalog.js";
 import { customerIdentity, deleteRoom, mintToken, publish } from "../realtime/livekit.js";
 import { clearFallback } from "../routing/handoff.js";
 import { httpError, requireCustomer, signToken } from "./auth.js";
@@ -100,6 +101,8 @@ export async function customerRoutes(app: FastifyInstance): Promise<void> {
       ).rows[0];
     }
 
+    // AI voice assistant: available when voice is enabled in .env and switched on in Voice settings
+    const aiVoice = config.enableVoice && (await getSelection().then((r) => r.selection.enabled, () => false));
     const livekitToken = await mintToken({
       conversationId: conv.id, identity: customerIdentity(customer.id), name: profile.name, role: "customer",
     });
@@ -110,7 +113,7 @@ export async function customerRoutes(app: FastifyInstance): Promise<void> {
       livekitUrl: config.livekitPublicUrl,
       livekitToken,
       backendToken: signToken({ role: "customer", sub: customer.id, conv: conv.id }),
-      features: { voice: config.enableVoice, video: config.enableVideo },
+      features: { voice: config.enableVoice, video: config.enableVideo, aiVoice },
       profile: { name: profile.name, email: profile.email, phone: profile.phone },
     };
   });

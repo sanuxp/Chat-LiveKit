@@ -167,3 +167,6 @@
 .sc-bin { width: 32px; height: 32px; margin: -4px -6px -4px 0; padding: 0; border: 0; border-radius: 9999px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; background: transparent; color: var(--fgSerious); transition: background-color .2s; }
 .sc-bin:hover, .sc-bin:focus-visible { background: var(--bgSerious); outline: none; }
 .sc-bin svg { width: 18px; height: 18px; }
+
+.sc-assistant { margin-left: auto; align-self: center; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--fg3); padding-right: 8px; }
+.sc-assistant::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #16a34a; animation: sc-blink 1.4s steps(1) infinite; }

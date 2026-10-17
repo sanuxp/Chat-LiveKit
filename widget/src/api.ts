@@ -22,7 +22,7 @@ export interface Session {
   livekitUrl: string;
   livekitToken: string;
   backendToken: string;
-  features: { voice: boolean; video: boolean };
+  features: { voice: boolean; video: boolean; aiVoice?: boolean };
   profile: { name: string; email: string; phone: string };
 }
 

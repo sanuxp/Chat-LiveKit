@@ -27,7 +27,7 @@ export interface ConversationOptions {
   livekitUrl: string;
   livekitToken: string;
   /** Open the LiveKit room for calls and allow mic/camera. Chat itself needs only the room's data channel. */
-  calls?: { voice: boolean; video: boolean };
+  calls?: { voice: boolean; video: boolean; aiVoice?: boolean };
 }
 
 export function useConversation(o: ConversationOptions) {
@@ -42,6 +42,7 @@ export function useConversation(o: ConversationOptions) {
   const [camOn, setCamOn] = useState(false);
   const [remoteVideo, setRemoteVideo] = useState<LKTrack | null>(null);
   const [localVideo, setLocalVideo] = useState<LKTrack | null>(null);
+  const [assistantOn, setAssistantOn] = useState(false); // the AI voice worker is in the room
   const roomRef = useRef<Room | null>(null);
   const authHeaders = { Authorization: `Bearer ${o.backendToken}`, "Content-Type": "application/json" };
 
@@ -99,6 +100,8 @@ export function useConversation(o: ConversationOptions) {
 
     room
       .on(RoomEvent.DataReceived, onData)
+      .on(RoomEvent.ParticipantConnected, (p) => { if (p.isAgent) setAssistantOn(true); })
+      .on(RoomEvent.ParticipantDisconnected, (p) => { if (p.isAgent) setAssistantOn(false); })
       .on(RoomEvent.TrackSubscribed, onSubscribed)
       .on(RoomEvent.TrackUnsubscribed, onUnsubscribed)
       .on(RoomEvent.LocalTrackPublished, (pub) => {
@@ -119,6 +122,7 @@ export function useConversation(o: ConversationOptions) {
         // connect first so no event is missed, then load history and merge by id
         await room.connect(o.livekitUrl, o.livekitToken);
         if (cancelled) return;
+        setAssistantOn([...room.remoteParticipants.values()].some((p) => p.isAgent));
         await loadHistory();
       } catch {
         if (!cancelled) setError("Could not connect. Please try again.");
@@ -145,9 +149,16 @@ export function useConversation(o: ConversationOptions) {
   const toggleMic = useCallback(async () => {
     const room = roomRef.current;
     if (!room || !o.calls?.voice) return;
-    try { await room.localParticipant.setMicrophoneEnabled(!micOn); setMicOn(!micOn); }
+    try {
+      // while the AI is handling the chat, turning the mic on asks the backend to bring the voice assistant into the room
+      if (!micOn && o.calls.aiVoice && status === "ai") {
+        await fetch(`${o.backendUrl}/api/conversations/${o.conversationId}/voice/start`, { method: "POST", headers: authHeaders }).catch(() => {});
+      }
+      await room.localParticipant.setMicrophoneEnabled(!micOn); setMicOn(!micOn);
+    }
     catch { setError("Could not access the microphone."); }
-  }, [micOn, o.calls?.voice]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [micOn, status, o.calls?.voice, o.calls?.aiVoice, o.backendUrl, o.backendToken, o.conversationId]);
 
   const toggleCam = useCallback(async () => {
     const room = roomRef.current;
@@ -156,6 +167,18 @@ export function useConversation(o: ConversationOptions) {
     catch { setError("Could not access the camera."); }
   }, [camOn, o.calls?.video]);
 
+  // the voice worker can miss the first request while it warms a new process: ask again (the backend never starts two)
+  useEffect(() => {
+    if (!micOn || !o.calls?.aiVoice || status !== "ai" || assistantOn) return;
+    let tries = 0;
+    const t = setInterval(() => {
+      if (++tries > 4) return clearInterval(t);
+      void fetch(`${o.backendUrl}/api/conversations/${o.conversationId}/voice/start`, { method: "POST", headers: { Authorization: `Bearer ${o.backendToken}` } }).catch(() => {});
+    }, 22_000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [micOn, status, assistantOn, o.calls?.aiVoice, o.backendUrl, o.backendToken, o.conversationId]);
+
   // history + live partial answers, oldest first
   const lines: Line[] = [...messages.values()];
   for (const [id, { body }] of streams) {
@@ -163,5 +186,5 @@ export function useConversation(o: ConversationOptions) {
   }
   lines.sort((a, b) => (a.streaming ? 1 : 0) - (b.streaming ? 1 : 0) || a.at.localeCompare(b.at));
 
-  return { lines, typing, status, agent, connected, error, setError, send, micOn, camOn, toggleMic, toggleCam, remoteVideo, localVideo };
+  return { lines, typing, status, agent, connected, error, setError, send, micOn, camOn, toggleMic, toggleCam, remoteVideo, localVideo, assistantOn };
 }

@@ -48,6 +48,18 @@ services:
     ports:
       - "127.0.0.1:${BACKEND_PORT:-3000}:${BACKEND_PORT:-3000}"
 
+  # AI voice assistant (LiveKit Agents worker). Optional: start it with `docker compose --profile voice up -d --build`.
+  voice-agent:
+    profiles: ["voice"]
+    build: ./voice-agent
+    restart: unless-stopped
+    depends_on: [backend, livekit]
+    env_file: .env
+    environment:
+      LIVEKIT_URL: ws://livekit:7880
+      BACKEND_URL: http://backend:${BACKEND_PORT:-3000}
+      VOICE_IDLE_PROCESSES: ${VOICE_IDLE_PROCESSES:-2}   # warm job processes; a new one takes ~10 s to start
+
   caddy:
     image: caddy:2
     restart: unless-stopped

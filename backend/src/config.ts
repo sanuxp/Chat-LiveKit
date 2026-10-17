@@ -21,4 +21,7 @@ export const config = {
   // Whether participants may publish microphone / camera tracks. Text chat works with both off.
   enableVoice: opt("ENABLE_VOICE", "false") === "true",
   enableVideo: opt("ENABLE_VIDEO", "false") === "true",
+  // AI voice: a LiveKit Agents worker (voice-agent/) is dispatched into the room when the customer turns on the mic.
+  voiceAgentName: opt("VOICE_AGENT_NAME", "support-voice"),
+  internalApiToken: opt("INTERNAL_API_TOKEN"), // shared secret between the backend and the voice worker
 };

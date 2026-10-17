@@ -1,4 +1,5 @@
-import { AccessToken, DataPacket_Kind, RoomServiceClient, TrackSource } from "livekit-server-sdk";
+import { ParticipantInfo_Kind } from "@livekit/protocol";
+import { AccessToken, AgentDispatchClient, DataPacket_Kind, RoomServiceClient, TrackSource } from "livekit-server-sdk";
 import { config } from "../config.js";
 
 /**
@@ -14,6 +15,23 @@ export const customerIdentity = (customerId: string) => `customer_${customerId}`
 export const agentIdentity = (username: string) => `agent_${username}`;
 
 const rooms = new RoomServiceClient(config.livekitUrl, config.livekitApiKey, config.livekitApiSecret);
+
+const dispatches = new AgentDispatchClient(config.livekitUrl, config.livekitApiKey, config.livekitApiSecret);
+const recentDispatch = new Map<string, number>();
+
+/** Ask LiveKit to start the voice worker in this conversation's room, unless one is already there or was just requested. */
+export async function dispatchVoiceAgent(conversationId: string): Promise<"started" | "already"> {
+  const last = recentDispatch.get(conversationId) ?? 0;
+  if (Date.now() - last < 20_000) return "already"; // double click / worker still joining
+  const present = await rooms.listParticipants(roomName(conversationId)).catch(() => []);
+  if (present.some((p) => p.kind === ParticipantInfo_Kind.AGENT)) return "already";
+  recentDispatch.set(conversationId, Date.now());
+  // A dispatch that found no free worker is never retried by LiveKit. Drop it so a retry can't end up with two assistants.
+  const stale = await dispatches.listDispatch(roomName(conversationId)).catch(() => []);
+  for (const d of stale) if (d.agentName === config.voiceAgentName) await dispatches.deleteDispatch(d.id, roomName(conversationId)).catch(() => {});
+  await dispatches.createDispatch(roomName(conversationId), config.voiceAgentName, { metadata: JSON.stringify({ conversationId }) });
+  return "started";
+}
 
 export interface WireMessage {
   id: string;

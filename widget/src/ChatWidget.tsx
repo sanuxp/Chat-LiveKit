@@ -116,6 +116,7 @@ function Conversation({ session, opts, visible, onRestart }: { session: Session;
   const calls = {
     voice: session.features.voice && opts.calls?.voice !== false,
     video: session.features.video && opts.calls?.video !== false,
+    aiVoice: !!session.features.aiVoice,
   };
   const c = useConversation({
     backendUrl: opts.backendUrl,
@@ -167,6 +168,7 @@ function Conversation({ session, opts, visible, onRestart }: { session: Session;
   const ended = c.status === "closed";
   const hasStream = c.lines.some((l) => l.streaming);
   const showCalls = calls.voice || calls.video;
+  const talkToAi = calls.aiVoice && c.status === "ai";
 
   return (
     <>
@@ -225,10 +227,11 @@ function Conversation({ session, opts, visible, onRestart }: { session: Session;
                 <div className="sc-controls">
                   {calls.voice && (
                     <button type="button" className={`sc-toggle ${c.micOn ? "" : "sc-off"}`} onClick={() => void c.toggleMic()}
-                      aria-label={c.micOn ? "Mute microphone" : "Turn on microphone"} aria-pressed={c.micOn} disabled={!c.connected}>
+                      aria-label={c.micOn ? "Mute microphone" : talkToAi ? "Talk to the AI assistant" : "Turn on microphone"} aria-pressed={c.micOn} disabled={!c.connected}>
                       <MicIcon off={!c.micOn} />
                     </button>
                   )}
+                  {c.assistantOn && <span className="sc-assistant" role="status">Voice assistant connected</span>}
                   {calls.video && (
                     <button type="button" className={`sc-toggle ${c.camOn ? "" : "sc-off"}`} onClick={() => void c.toggleCam()}
                       aria-label={c.camOn ? "Turn off camera" : "Turn on camera"} aria-pressed={c.camOn} disabled={!c.connected}>

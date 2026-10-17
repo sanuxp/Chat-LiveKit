@@ -5,6 +5,7 @@ import { adminRoutes } from "./admin.js";
 import { agentRoutes } from "./agent.js";
 import { conversationRoutes } from "./conversations.js";
 import { customerRoutes } from "./customer.js";
+import { voiceRoutes } from "./voice.js";
 
 export async function startApi(): Promise<void> {
   // Never log request bodies; fastify's default request logging only records method/url/status.
@@ -19,6 +20,7 @@ export async function startApi(): Promise<void> {
   await app.register(customerRoutes);
   await app.register(conversationRoutes);
   await app.register(agentRoutes);
+  await app.register(voiceRoutes);
   await app.register(adminRoutes);
   await app.listen({ port: config.backendPort, host: "0.0.0.0" });
 }

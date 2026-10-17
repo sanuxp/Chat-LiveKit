@@ -190,7 +190,7 @@ export function toolOptions(name: string | null): Record<string, unknown> | unde
 
 export async function executeTool(
   name: string, argsJson: string, conversationId: string,
-): Promise<{ ok: boolean; llmResult: unknown; endTurn?: boolean }> {
+): Promise<{ ok: boolean; llmResult: unknown; endTurn?: boolean; customerText?: string }> {
   const tool = state.tools.get(name);
   if (!tool) return { ok: false, llmResult: { error: "Unknown tool" } };
 
@@ -230,12 +230,14 @@ export async function executeTool(
   if (!res.ok) return { ok: false, llmResult: res.llmResult };
 
   const tpl = res.customerMessage ?? tool.def.customer_message;
+  let customerText: string | undefined;
   if (tpl) {
-    await addMessage(conversationId, { role: "ai", body: renderTemplate(tpl, { ...profileVars(customer), ...args, conversation_id: conversationId, customer_ref: customerRef }) });
+    customerText = renderTemplate(tpl, { ...profileVars(customer), ...args, conversation_id: conversationId, customer_ref: customerRef });
+    if (customerText) await addMessage(conversationId, { role: "ai", body: customerText });
   }
   await applyAfter(conversationId, name, tool.def.after);
   // pause_ai / close: the AI must not add more text this turn (it would duplicate customer_message)
-  return { ok: true, llmResult: res.llmResult, endTurn: tool.def.after !== "continue_ai" };
+  return { ok: true, llmResult: res.llmResult, endTurn: tool.def.after !== "continue_ai", customerText };
 }
 
 async function applyAfter(conversationId: string, name: string, after: After): Promise<void> {
