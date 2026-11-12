@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { enqueueAiReply } from "../ai/agent.js";
 import { addMessage, agentDisplayName, getHandoff, getHistory } from "../conversations.js";
 import { pool } from "../db/db.js";
+import { closeIfExpired } from "../session/expiry.js";
 import { httpError, verifyToken, type Claims } from "./auth.js";
 
 const MAX_BODY = 4000;
@@ -39,6 +40,7 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
     if (!body) throw httpError(400, "body required");
     if (body.length > MAX_BODY) throw httpError(400, `body too long (max ${MAX_BODY})`);
     if (conv.status === "closed") throw httpError(409, "Conversation has ended");
+    if (claims.role === "customer" && (await closeIfExpired(req.params.id))) throw httpError(409, "Conversation has ended");
 
     if (claims.role === "customer") {
       const msg = await addMessage(req.params.id, { role: "customer", body });

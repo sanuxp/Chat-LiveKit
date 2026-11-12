@@ -1,0 +1,9 @@
+# Test override used by scripts/session-test.mjs: a 14-second session lifetime, with verified-login or anonymous mode.
+#   Do not use in production. Restore normal settings with: docker compose up -d --force-recreate backend
+services:
+  backend:
+    environment:
+      CUSTOMER_AUTH_MODE: ${TEST_AUTH_MODE:-external_jwt}
+      EXTERNAL_JWT_PUBLIC_KEY: ${TEST_JWT_PUBLIC_KEY:-unused}
+      SESSION_TTL_HOURS: "0.004"
+      SESSION_SWEEP_SECONDS: "3"

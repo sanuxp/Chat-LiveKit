@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { config } from "./config.js";
 import { pool } from "./db/db.js";
 import { agentIdentity, publish, type WireMessage } from "./realtime/livekit.js";
 
@@ -53,6 +54,7 @@ export async function setHandoff(conversationId: string, update: Partial<Handoff
       vals,
     );
   }
+  await pool.query("UPDATE conversations SET closed_at = COALESCE(closed_at, now()) WHERE id=$1 AND status='closed'", [conversationId]);
   const next = await getHandoff(conversationId);
   await publish(conversationId, { t: "state", status: next.status, agent: await agentDisplayName(next.agent_id) });
   return next;
@@ -91,7 +93,14 @@ export async function addMessage(conversationId: string, m: NewMessage): Promise
      VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id, role, sender, kind, internal, body, created_at`,
     [m.id ?? randomUUID(), conversationId, m.role, m.sender ?? null, m.kind ?? "text", !!m.internal, m.body],
   );
-  await pool.query("UPDATE conversations SET updated_at=now() WHERE id=$1", [conversationId]);
+  // the session clock starts at the customer's first message (typed or spoken) and is never extended
+  await pool.query(
+    `UPDATE conversations SET updated_at=now(),
+            first_message_at = CASE WHEN $2 THEN COALESCE(first_message_at, now()) ELSE first_message_at END,
+            expires_at = CASE WHEN $2 THEN COALESCE(expires_at, now() + make_interval(secs => $3)) ELSE expires_at END
+      WHERE id=$1`,
+    [conversationId, m.role === "customer", config.sessionTtlHours * 3600],
+  );
   const wire = toWire(r.rows[0]);
   let to: string[] | undefined;
   if (wire.internal) {

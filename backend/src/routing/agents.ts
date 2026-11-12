@@ -1,6 +1,7 @@
 import { pool } from "../db/db.js";
 import { agentDisplayName, getHandoff, sendNotice } from "../conversations.js";
 import { agentIdentity, removeParticipant } from "../realtime/livekit.js";
+import { closeExpired, isExpired } from "../session/expiry.js";
 import { updateHandoff } from "./handoff.js";
 
 export async function setPresence(username: string, online: boolean): Promise<void> {
@@ -45,7 +46,11 @@ export function assignToAgent(conversationId: string, agent: string): Promise<"a
 }
 
 export async function resolveConversation(conversationId: string, agent: string, returnToAi: boolean): Promise<void> {
-  if (returnToAi) {
+  if (returnToAi && (await isExpired(conversationId))) {
+    // the 24 h session window ended while the customer was with a person: finish here instead of going back to the AI
+    await updateHandoff(conversationId, { status: "ai", agent_id: null, channel: null, reason: null, summary: null, ai_note: null });
+    await closeExpired(conversationId);
+  } else if (returnToAi) {
     await updateHandoff(conversationId, { status: "ai", agent_id: null, channel: null, reason: null, summary: null, ai_note: null });
     await sendNotice(conversationId, "You're chatting with our AI assistant again.");
   } else {

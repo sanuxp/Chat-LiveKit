@@ -54,3 +54,12 @@ CREATE TABLE IF NOT EXISTS settings (
   value jsonb NOT NULL,
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- session expiry: the clock starts at the customer's first message and is never extended
+ALTER TABLE conversations
+  ADD COLUMN IF NOT EXISTS first_message_at timestamptz,
+  ADD COLUMN IF NOT EXISTS expires_at timestamptz,
+  ADD COLUMN IF NOT EXISTS closed_at timestamptz,
+  ADD COLUMN IF NOT EXISTS closed_reason text;     -- expired | ... (null for conversations ended by an agent)
+CREATE INDEX IF NOT EXISTS conversations_expiry ON conversations (expires_at)
+  WHERE status IN ('ai', 'escalated_external') AND deleted_at IS NULL;

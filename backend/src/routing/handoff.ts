@@ -1,4 +1,5 @@
 import { getHandoff, sendNotice, setHandoff, type HandoffState } from "../conversations.js";
+import { closeIfExpired } from "../session/expiry.js";
 
 /** The ONE place hand-off state changes: persists it and notifies the room. */
 export async function updateHandoff(conversationId: string, update: Partial<HandoffState>): Promise<HandoffState> {
@@ -34,6 +35,7 @@ export function armFallback(conversationId: string, seconds: number, fallbackToo
             : "No human agent became available for this customer. Apologise briefly and keep helping as best you can.",
         });
         await sendNotice(conversationId, "Sorry, nobody on our team is available right now.");
+        await closeIfExpired(conversationId); // the session window may have ended while waiting
         console.log(JSON.stringify({ msg: "fallback fired", conversationId }));
       } catch (e: any) {
         console.log(JSON.stringify({ msg: "fallback error", conversationId, error: e?.message }));

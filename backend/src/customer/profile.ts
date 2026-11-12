@@ -116,6 +116,24 @@ export function storedFromRow(row: { name?: string | null; email?: string | null
 export const sameProfile = (a: StoredProfile, b: StoredProfile) =>
   a.name === b.name && a.email === b.email && a.phone === b.phone && JSON.stringify(a.metadata) === JSON.stringify(b.metadata);
 
+const norm = (v?: string | null) => (v ?? "").trim().toLowerCase();
+
+/**
+ * Anonymous mode only (nothing is verified): does the user the host page sends now look like a different person
+ * from the one this browser's visitor id was created for? Email decides, then name, then phone.
+ * A page that stops sending any user (logged out) counts as a different person. A visitor that was anonymous before
+ * and now sends details is treated as the same person (they just logged in).
+ */
+export function isDifferentPerson(stored: StoredProfile, provided: ProvidedProfile): boolean {
+  const keys = ["email", "name", "phone"] as const;
+  if (!keys.some((k) => norm(stored[k]))) return false;
+  if (!keys.some((k) => norm(provided[k]))) return true;
+  for (const k of keys) {
+    if (norm(stored[k]) && norm(provided[k])) return norm(stored[k]) !== norm(provided[k]);
+  }
+  return false;
+}
+
 /** Resolved profile (defaults applied) of the customer who owns a conversation room. */
 export async function getProfileByConversation(conversationId: string): Promise<Profile> {
   const r = await pool.query(
