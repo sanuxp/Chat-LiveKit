@@ -6,21 +6,21 @@
 
 .sc-root {
   --fg0: #000000; --fg1: #3b3b3b; --fg3: #636363; --fg4: #707070;
-  --fgSerious: #db1b06; --fgAccent: #002cf2;
+  --fgSerious: #c4180a; --fgAccent: #002cf2;
   --bg1: #f9f9f6; --bg2: #f3f3f1; --bg3: #e2e2df;
   --bgSerious: #fae6e6; --bgSerious2: #ffcdc7; --bgAccentPrimary: #e2ebfd;
   --sep1: #dbdbd8; --sep2: #bdbdbb;
   --background: #ffffff; --foreground: #0a0a0a;
   --primary: #002cf2; --primary-hover: #0020b9; --primary-fg: #fafafa;
   --secondary: #f5f5f5; --secondary-fg: #171717;
-  --call: #ff0000;
+  --call: #d40000;
 
   font: 14px/20px ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   color: var(--foreground);
   color-scheme: light;
 }
 .sc-root.sc-dark {
-  --fg0: #ffffff; --fg1: #cccccc; --fg3: #999999; --fg4: #666666;
+  --fg0: #ffffff; --fg1: #cccccc; --fg3: #a3a3a3; --fg4: #8a8a8a;
   --fgSerious: #ff7566; --fgAccent: #1fd5f9;
   --bg1: #070707; --bg2: #131313; --bg3: #202020;
   --bgSerious: #1f0e0b; --bgSerious2: #5a1c16; --bgAccentPrimary: #0c1640;
@@ -40,10 +40,11 @@
   display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
   background: var(--call); color: #fff;
   box-shadow: 0 10px 15px -3px rgb(0 0 0 / .2), 0 4px 6px -4px rgb(0 0 0 / .2);
-  transition: transform .3s, box-shadow .3s; outline: none;
+  transition: transform .3s, box-shadow .3s;
 }
 .sc-trigger:hover { transform: translateY(-2px); box-shadow: 0 20px 25px -5px rgb(0 0 0 / .25), 0 8px 10px -6px rgb(0 0 0 / .25); }
-.sc-trigger:focus-visible { box-shadow: 0 0 0 3px rgb(255 0 0 / .4); }
+.sc-trigger:focus-visible { outline: 3px solid #1d4ed8; outline-offset: 3px; }
+.sc-dark .sc-trigger:focus-visible { outline-color: #1fd5f9; }
 .sc-trigger svg { width: 20px; height: 20px; animation: sc-pop .3s cubic-bezier(.34, 1.56, .64, 1); }
 .sc-badge { position: absolute; top: 2px; right: 2px; width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 3px solid var(--call); }
 @keyframes sc-pop { from { transform: scale(.8) rotate(-90deg); opacity: 0; } to { transform: none; opacity: 1; } }
@@ -118,6 +119,7 @@
 .sc-form input { flex: 1; min-width: 0; height: 36px; padding: 0 0 0 8px; border: 0; outline: none; background: transparent; color: inherit; font: inherit; font-size: 14px; }
 .sc-form input::placeholder { color: var(--fg4); }
 .sc-form input:disabled { cursor: not-allowed; opacity: .5; }
+.sc-bar:focus-within { outline: 3px solid color-mix(in srgb, var(--primary) 70%, transparent); outline-offset: 1px; }
 .sc-hr { border: 0; border-top: 1px solid var(--bg2); margin: 4px 0; width: 100%; }
 .sc-controls { display: flex; gap: 4px; }
 
@@ -139,7 +141,8 @@
 .sc-toggle.sc-off { color: var(--fgSerious); }
 .sc-toggle:disabled { opacity: .5; cursor: default; pointer-events: none; }
 .sc-toggle svg { width: 16px; height: 16px; }
-.sc-toggle:focus-visible, .sc-send:focus-visible, .sc-primary:focus-visible { outline: 3px solid color-mix(in srgb, var(--primary) 40%, transparent); }
+.sc-toggle:focus-visible, .sc-send:focus-visible, .sc-primary:focus-visible, .sc-confirm button:focus-visible, .sc-bin:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+.sc-transcript:focus-visible { outline: 3px solid var(--primary); outline-offset: -3px; }
 
 .sc-primary {
   width: 100%; height: 36px; border: 0; border-radius: 6px; cursor: pointer;
@@ -157,13 +160,19 @@
 .sc-confirm div { display: flex; justify-content: center; gap: 8px; margin-top: 8px; }
 .sc-confirm button { height: 32px; padding: 0 12px; border: 0; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
 .sc-confirm .sc-danger { background: var(--fgSerious); color: #fff; }
+.sc-dark .sc-confirm .sc-danger { color: #0a0a0a; }
 .sc-confirm .sc-cancel { background: var(--bg2); color: var(--fg1); }
 
+.sc-sr { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) {
+  .sc-root *, .sc-root *::before, .sc-root *::after { animation: none !important; transition-duration: .01ms !important; }
+  .sc-popup { transform: none; }
+}
 /* streaming caret */
 .sc-caret { display: inline-block; width: 2px; height: 1em; margin-left: 2px; vertical-align: text-bottom; background: currentColor; opacity: .6; animation: sc-blink 1s steps(1) infinite; }
 @keyframes sc-blink { 50% { opacity: 0; } }
 
 /* delete (bin) button */
 .sc-bin { width: 32px; height: 32px; margin: -4px -6px -4px 0; padding: 0; border: 0; border-radius: 9999px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; background: transparent; color: var(--fgSerious); transition: background-color .2s; }
-.sc-bin:hover, .sc-bin:focus-visible { background: var(--bgSerious); outline: none; }
+.sc-bin:hover, .sc-bin:focus-visible { background: var(--bgSerious); }
 .sc-bin svg { width: 18px; height: 18px; }
