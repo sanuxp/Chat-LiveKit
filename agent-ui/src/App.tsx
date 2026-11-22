@@ -90,20 +90,21 @@ export function App() {
 
   return (
     <div className="app">
+      <a className="skip-link" href="#main">Skip to main content</a>
       <header className="top">
-        <strong>Agent console</strong>
+        <h1 style={{ fontSize: "inherit", margin: 0 }}>Agent console</h1>
         <span className="muted">{session.displayName}</span>
         <div className="spacer" />
-        <button className={online ? "online" : "secondary"} onClick={toggleOnline}>
-          <span className={`dot ${online ? "on" : ""}`} /> {online ? "Online" : "Offline"}
+        <button className={online ? "online" : "secondary"} onClick={toggleOnline} aria-pressed={online}>
+          <span className={`dot ${online ? "on" : ""}`} aria-hidden="true" /> {online ? "Online" : "Offline"}
         </button>
         <button className="secondary" onClick={() => { setOpen(null); setView(view === "voice" ? "queue" : "voice"); }}>
           {view === "voice" ? "Queue" : "Voice settings"}
         </button>
         <button className="secondary" onClick={() => void signOut()}>Sign out</button>
       </header>
-      {error && <p className="error banner" onClick={() => setError(null)}>{error}</p>}
-      <main>
+      {error && <p className="error banner" role="alert"><span>{error}</span><button type="button" onClick={() => setError(null)}>Dismiss</button></p>}
+      <main id="main" tabIndex={-1}>
         {view === "voice" ? (
           <VoiceSettings token={token} onClose={() => setView("queue")} />
         ) : open ? (

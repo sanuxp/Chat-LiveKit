@@ -71,17 +71,17 @@ export function ConversationView({ token, conversationId, online, onClose, onDec
   if (gone) {
     return (
       <div className="conv">
-        <header><button className="secondary" onClick={onClose}>← Back</button></header>
-        <p className="error" style={{ padding: 14 }}>{gone}</p>
+        <header><button className="secondary" onClick={onClose}><span aria-hidden="true">← </span>Back to queue</button></header>
+        <p className="error" role="alert" style={{ padding: 14 }}>{gone}</p>
       </div>
     );
   }
-  if (!preview) return <p className="muted">Loading…</p>;
+  if (!preview) return <p className="muted" role="status">Loading…</p>;
 
   return (
     <div className="conv">
       <header>
-        <button className="secondary" onClick={onClose}>← Back</button>
+        <button className="secondary" onClick={onClose}><span aria-hidden="true">← </span>Back to queue</button>
         <div className="spacer" />
         <button className="secondary" onClick={onDecline} disabled={accepting} title="Leave it in the queue for another agent">
           Decline
@@ -92,7 +92,7 @@ export function ConversationView({ token, conversationId, online, onClose, onDec
       </header>
       <CustomerCard customer={preview.customer} />
       <SummaryBanner summary={preview.summary} reason={preview.reason} />
-      {error && <p className="error" style={{ padding: "0 14px" }}>{error}</p>}
+      {error && <p className="error" role="alert" style={{ padding: "0 14px" }}>{error}</p>}
       <div className="conv-body">
         <div className="conv-chat">
           <Timeline lines={preview.messages} />
@@ -134,18 +134,18 @@ function Timeline({ lines, typing, ended, listRef }: { lines: Line[]; typing?: b
   const ref = listRef ?? own;
   useEffect(() => { const el = ref.current; if (el) el.scrollTop = el.scrollHeight; }, [lines, typing, ref]);
   return (
-    <div className="timeline" ref={ref}>
+    <div className="timeline" ref={ref} role="log" aria-live="polite" aria-label="Conversation messages" tabIndex={0}>
       {lines.map((l) => {
         const who = l.internal ? "summary" : l.kind === "notice" ? "notice" : l.role === "agent" ? "me" : l.role === "customer" ? "customer" : "ai";
         const name = l.internal ? "AI summary" : l.role === "agent" ? "You" : l.role === "customer" ? "Customer" : l.role === "ai" ? "AI assistant" : "System";
         return (
           <div key={l.id} className={`msg ${who}`}>
-            <div className="who">{name}</div>
+            <div className="who">{name}<span className="sr-only">:</span></div>
             <div className="body">{l.body}</div>
           </div>
         );
       })}
-      {typing && <p className="muted">AI is typing…</p>}
+      {typing && <p className="muted" role="status">AI is typing…</p>}
       {ended && <p className="muted center">{ended}</p>}
     </div>
   );
@@ -190,39 +190,39 @@ function Room({ token, conversationId, join, onClose }: { token: string; convers
   return (
     <div className="conv">
       <header>
-        <button className="secondary" onClick={onClose}>← Back</button>
+        <button className="secondary" onClick={onClose}><span aria-hidden="true">← </span>Back to queue</button>
         <div className="spacer" />
         {join.features.voice && (
-          <button className={c.micOn ? "online" : "secondary"} onClick={() => void c.toggleMic()} disabled={!c.connected || ended}>
-            🎤 {c.micOn ? "Mute" : "Voice"}
+          <button className={c.micOn ? "online" : "secondary"} onClick={() => void c.toggleMic()} aria-pressed={c.micOn} disabled={!c.connected || ended}>
+            <span aria-hidden="true">🎤 </span>{c.micOn ? "Mute" : "Voice"}
           </button>
         )}
         {join.features.video && (
-          <button className={c.camOn ? "online" : "secondary"} onClick={() => void c.toggleCam()} disabled={!c.connected || ended}>
-            📷 {c.camOn ? "Stop video" : "Video"}
+          <button className={c.camOn ? "online" : "secondary"} onClick={() => void c.toggleCam()} aria-pressed={c.camOn} disabled={!c.connected || ended}>
+            <span aria-hidden="true">📷 </span>{c.camOn ? "Stop video" : "Video"}
           </button>
         )}
-        <button disabled={busy || ended} onClick={() => resolve(true)}>Resolve → back to AI</button>
+        <button disabled={busy || ended} onClick={() => resolve(true)}>Resolve and return to AI</button>
         <button className="secondary" disabled={busy || ended} onClick={() => resolve(false)}>Resolve &amp; close</button>
       </header>
       <CustomerCard customer={join.customer} />
       <SummaryBanner summary={join.summary} reason={join.reason} />
       {ended && c.status === "deleted" && (
-        <div className="ended-banner">The customer ended this conversation. <button onClick={onClose}>Back to queue</button></div>
+        <div className="ended-banner" role="status">The customer ended this conversation. <button onClick={onClose}>Back to queue</button></div>
       )}
-      {(c.error || actionError) && <p className="error">{c.error ?? actionError}</p>}
+      {(c.error || actionError) && <p className="error" role="alert">{c.error ?? actionError}</p>}
       <div className="conv-body">
         <div className="conv-chat">
           <Timeline lines={c.lines} typing={c.typing} ended={endedText} />
           <form className="composer" onSubmit={(e) => { e.preventDefault(); void send(); }}>
-            <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Reply to the customer…" disabled={!c.connected || ended} />
+            <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Reply to the customer…" aria-label="Reply to the customer" disabled={!c.connected || ended} />
             <button type="submit" disabled={!c.connected || ended || !text.trim()}>Send</button>
           </form>
         </div>
         {showCall && (c.remoteVideo || c.localVideo) && (
-          <aside className="call">
-            {c.remoteVideo && <TrackVideo track={c.remoteVideo} />}
-            {c.localVideo && <TrackVideo track={c.localVideo} muted className="self" />}
+          <aside className="call" aria-label="Video call">
+            {c.remoteVideo && <TrackVideo track={c.remoteVideo} label="Customer video" />}
+            {c.localVideo && <TrackVideo track={c.localVideo} muted className="self" label="Your camera preview" />}
           </aside>
         )}
       </div>

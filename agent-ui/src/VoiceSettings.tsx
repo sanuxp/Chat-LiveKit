@@ -48,14 +48,14 @@ function Combo({ label, value, options, custom, onChange }: { label: string; val
 
 function Num({ name, f, value, onChange }: { name: string; f: Field; value: number; onChange: (v: number) => void }) {
   return (
-    <label className="vs-field" key={name}>
-      <span>{f.label}</span>
+    <div className="vs-field" role="group" aria-label={f.label} key={name}>
+      <span aria-hidden="true">{f.label}</span>
       <div className="vs-num">
-        <input type="range" min={f.min} max={f.max} step={f.step} value={value} onChange={(e) => onChange(Number(e.target.value))} />
-        <input type="number" min={f.min} max={f.max} step={f.step} value={value} onChange={(e) => onChange(Number(e.target.value))} />
+        <input type="range" aria-label={`${f.label} (slider)`} min={f.min} max={f.max} step={f.step} value={value} onChange={(e) => onChange(Number(e.target.value))} />
+        <input type="number" aria-label={`${f.label} (value)`} min={f.min} max={f.max} step={f.step} value={value} onChange={(e) => onChange(Number(e.target.value))} />
       </div>
       {f.help && <small className="vs-hint">{f.help}</small>}
-    </label>
+    </div>
   );
 }
 
@@ -108,7 +108,7 @@ export function VoiceSettings({ token, onClose }: { token: string; onClose: () =
 
   const issuesFor = (...fields: string[]) => issues.filter((i) => fields.includes(i.field));
   const Issues = ({ fields }: { fields: string[] }) => (
-    <>{issuesFor(...fields).map((i, k) => <p key={k} className={i.level === "error" ? "error vs-issue" : "vs-warn vs-issue"}>{i.level === "error" ? "✕ " : "⚠ "}{i.message}</p>)}</>
+    <>{issuesFor(...fields).map((i, k) => <p key={k} role={i.level === "error" ? "alert" : undefined} className={i.level === "error" ? "error vs-issue" : "vs-warn vs-issue"}><span aria-hidden="true">{i.level === "error" ? "✕ " : "⚠ "}</span><span className="sr-only">{i.level === "error" ? "Error: " : "Warning: "}</span>{i.message}</p>)}</>
   );
   const providerOptions = (t: Record<string, Provider>): [string, string][] => Object.entries(t).map(([id, p]) => [id, `${p.label}${p.configured ? "" : "  (needs setup)"}`]);
   const tunables = (p?: Provider) => (p?.tunables ?? []).filter((n) => cat?.fields[n]);
@@ -119,8 +119,8 @@ export function VoiceSettings({ token, onClose }: { token: string; onClose: () =
     return hit?.[0] ?? "custom";
   }, [cat, sel]);
 
-  if (error && !data) return <p className="error">{error}</p>;
-  if (!cat) return <p className="muted">Loading…</p>;
+  if (error && !data) return <p className="error" role="alert">{error}</p>;
+  if (!cat) return <p className="muted" role="status">Loading…</p>;
 
   const vad = cat.vad[sel.vad_provider as string], noise = cat.noise_cancellation[sel.noise_provider as string];
   const turn = cat.turn_detection[sel.turn_detection as string];
@@ -131,14 +131,14 @@ export function VoiceSettings({ token, onClose }: { token: string; onClose: () =
   return (
     <div className="vs">
       <header className="vs-head">
-        <button className="secondary" onClick={onClose}>← Back</button>
+        <button className="secondary" onClick={onClose}><span aria-hidden="true">← </span>Back to queue</button>
         <h2>Voice settings</h2>
         <div className="spacer" />
         <button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save"}</button>
       </header>
-      {saved && <p className="vs-saved">Saved. New calls use this pipeline; calls already running keep theirs.</p>}
-      {error && <p className="error">{error}</p>}
-      {hasErrors && <p className="error">Fix the problems marked ✕ to save.</p>}
+      {saved && <p className="vs-saved" role="status">Saved. New calls use this pipeline; calls already running keep theirs.</p>}
+      {error && <p className="error" role="alert">{error}</p>}
+      {hasErrors && <p className="error" role="alert">Fix the problems marked with an error to save.</p>}
       {!data!.voiceEnabledInEnv && <p className="vs-warn">Voice is off on the server: set ENABLE_VOICE=true in .env (and start the voice worker: docker compose --profile voice up -d).</p>}
 
       <section className="vs-card">
@@ -156,7 +156,7 @@ export function VoiceSettings({ token, onClose }: { token: string; onClose: () =
               onChange={(k) => cat.vad_presets[k] && set(cat.vad_presets[k].values)} />
           )}
         </div>
-        {vad && !vad.configured && <p className="vs-warn vs-issue">⚠ needs {vad.missing.join(", ")} in .env</p>}
+        {vad && !vad.configured && <p className="vs-warn vs-issue"><span aria-hidden="true">⚠ </span><span className="sr-only">Warning: </span>needs {vad.missing.join(", ")} in .env</p>}
         <div className="vs-grid"><Tunables p={vad} /></div>
         <Issues fields={["vad_provider"]} />
       </section>

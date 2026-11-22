@@ -39,6 +39,7 @@ export function ChatWidget({ opts }: { opts: WidgetOptions }) {
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const connecting = useRef(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const generation = useRef(0); // bumped when the user changes, so a late response for the old user is ignored
   const dark = useDark(opts.theme);
 
@@ -74,6 +75,14 @@ export function ChatWidget({ opts }: { opts: WidgetOptions }) {
   useEffect(() => { if (open) setEverOpened(true); }, [open]);
   useEffect(() => { if (everOpened && !session && !error) void start(); }, [everOpened, session, error, start]);
 
+  // Escape closes the (non-modal) dialog and returns focus to the launcher
+  const onPopupKey = (e: React.KeyboardEvent) => {
+    if (e.key !== "Escape") return;
+    e.stopPropagation();
+    if (confirmDelete) setConfirmDelete(false);
+    else { setOpen(false); triggerRef.current?.focus(); }
+  };
+
   const restart = async () => { setSession(null); await start(); };
 
   const doDelete = async () => {
@@ -86,19 +95,21 @@ export function ChatWidget({ opts }: { opts: WidgetOptions }) {
   return (
     <div className={`sc-root ${dark ? "sc-dark" : ""}`}>
       <button
+        ref={triggerRef}
         className="sc-trigger"
         onClick={() => setOpen((o) => !o)}
         aria-label={open ? "Close support chat" : "Open support chat"}
         aria-expanded={open}
+        aria-haspopup="dialog"
       >
         {open ? <CloseIcon key="x" /> : <ChatIcon key="chat" />}
       </button>
 
       {/* stays mounted once opened (just hidden), so the chat keeps receiving while minimised */}
-      <div className={`sc-popup ${open ? "sc-open" : ""}`} inert={!open} role="dialog" aria-label="Support chat">
+      <div className={`sc-popup ${open ? "sc-open" : ""}`} inert={!open} role="dialog" aria-label={opts.title ?? "Support chat"} onKeyDown={onPopupKey}>
         <div className="sc-card">
           <div className="sc-header">
-            <span className="sc-title">{opts.title ?? "Support"}</span>
+            <h2 className="sc-title" style={{ margin: 0 }}>{opts.title ?? "Support"}</h2>
             {session && (
               <button className="sc-bin" onClick={() => setConfirmDelete(true)} aria-label="Delete conversation" title="Delete conversation">
                 <TrashIcon />
@@ -106,10 +117,10 @@ export function ChatWidget({ opts }: { opts: WidgetOptions }) {
             )}
           </div>
           {confirmDelete && (
-            <div className="sc-confirm">
+            <div className="sc-confirm" role="alertdialog" aria-label="Confirm delete">
               Delete this conversation permanently?
               <div>
-                <button className="sc-danger" onClick={doDelete}>Delete</button>
+                <button className="sc-danger" onClick={doDelete} autoFocus>Delete</button>
                 <button className="sc-cancel" onClick={() => setConfirmDelete(false)}>Cancel</button>
               </div>
             </div>
@@ -117,7 +128,7 @@ export function ChatWidget({ opts }: { opts: WidgetOptions }) {
           {!session && (
             <div className="sc-transcript">
               <div className="sc-list">
-                {error ? <div className="sc-hint sc-error">{error}</div> : <div className="sc-hint">Connecting…</div>}
+                {error ? <div className="sc-hint sc-error" role="alert">{error}</div> : <div className="sc-hint" role="status">Connecting…</div>}
                 {error && <button className="sc-primary sc-retry" style={{ width: "auto", padding: "0 16px" }} onClick={() => void start()}>Try again</button>}
               </div>
             </div>
@@ -191,17 +202,17 @@ function Conversation({ session, opts, visible, onRestart }: { session: Session;
     <>
       {c.remoteVideo ? (
         <div className="sc-video">
-          <TrackVideo track={c.remoteVideo} className="sc-remote" />
-          {c.localVideo && <TrackVideo track={c.localVideo} muted className="sc-local" />}
+          <TrackVideo track={c.remoteVideo} className="sc-remote" label="Support agent video" />
+          {c.localVideo && <TrackVideo track={c.localVideo} muted className="sc-local" label="Your camera preview" />}
         </div>
       ) : c.localVideo ? (
-        <TrackVideo track={c.localVideo} muted className="sc-local sc-local-only" />
+        <TrackVideo track={c.localVideo} muted className="sc-local sc-local-only" label="Your camera preview" />
       ) : null}
 
-      <div className="sc-transcript" ref={listRef}>
+      <div className="sc-transcript" ref={listRef} role="log" aria-live="polite" aria-label="Messages" tabIndex={0}>
         <div className="sc-list">
-          {!c.connected && !c.error && <div className="sc-hint">Connecting…</div>}
-          {(c.error || sendError) && <div className="sc-hint sc-error">{c.error ?? "Message failed to send."}</div>}
+          {!c.connected && !c.error && <div className="sc-hint" role="status">Connecting…</div>}
+          {(c.error || sendError) && <div className="sc-hint sc-error" role="alert">{c.error ?? "Message failed to send."}</div>}
           {c.lines.length === 0 && c.connected && <div className="sc-hint">Hi! Ask us anything.</div>}
           {c.lines.map((l) => {
             if (l.kind === "notice") return <div key={l.id} className="sc-notice">{l.body}</div>;
@@ -209,13 +220,16 @@ function Conversation({ session, opts, visible, onRestart }: { session: Session;
             return (
               <div key={l.id} className={`sc-line ${cls}`}>
                 {l.role === "agent" && l.name && <span className="sc-name">{l.name}</span>}
+                {l.role === "customer" && <span className="sc-sr">You: </span>}
+                {l.role === "ai" && <span className="sc-sr">Assistant: </span>}
+                {l.role === "agent" && !l.name && <span className="sc-sr">Support agent: </span>}
                 <div className="sc-text">
                   {l.role === "ai" ? <Typewriter text={l.body} live={!!l.streaming} /> : l.body}
                 </div>
               </div>
             );
           })}
-          {c.typing && !hasStream && <div className="sc-typing" aria-live="polite" aria-label="typing"><i /><i /><i /></div>}
+          {c.typing && !hasStream && <div className="sc-typing" role="status"><span className="sc-sr">Support is typing</span><i aria-hidden="true" /><i aria-hidden="true" /><i aria-hidden="true" /></div>}
           {c.status === "waiting" && <div className="sc-hint">Waiting for a team member to join…</div>}
           {ended && <div className="sc-hint">This conversation has ended.</div>}
         </div>
@@ -231,7 +245,7 @@ function Conversation({ session, opts, visible, onRestart }: { session: Session;
                 ref={inputRef}
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                placeholder="Type something..."
+                placeholder="Type a message…"
                 disabled={!c.connected}
                 aria-label="Message"
                 autoComplete="off"
@@ -240,7 +254,7 @@ function Conversation({ session, opts, visible, onRestart }: { session: Session;
             </form>
             {showCalls && (
               <>
-                <hr className="sc-hr" />
+                <hr className="sc-hr" aria-hidden="true" />
                 <div className="sc-controls">
                   {calls.voice && (
                     <button type="button" className={`sc-toggle ${c.micOn ? "" : "sc-off"}`} onClick={() => void c.toggleMic()}
