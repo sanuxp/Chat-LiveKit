@@ -33,9 +33,12 @@ export function Typewriter({ text, live }: { text: string; live: boolean }) {
   }, [text, live]);
 
   const visible = animating.current ? text.slice(0, shown) : text;
+  // the animated text is hidden from assistive tech (it would be announced letter by letter);
+  // the full text is exposed once the message has finished streaming
   return (
     <>
-      {visible}
+      <span aria-hidden="true">{visible}</span>
+      {!live && <span className="sc-sr">{text}</span>}
       {live && <span className="sc-caret" aria-hidden="true" />}
     </>
   );
