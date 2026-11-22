@@ -1,0 +1,14 @@
+#!/bin/sh
+# Pre-push hook: typecheck + run the accessibility/unit tests for agent-ui and widget.
+# Enabled by `npm install` at the repo root (see the "prepare" script) or manually:
+#   git config core.hooksPath .githooks
+# Skip once (not recommended): git push --no-verify
+
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+echo "pre-push: running typecheck and tests (npm run check)..."
+if ! npm run --silent check; then
+  echo ""
+  echo "pre-push: checks failed, push aborted. Fix the problems above (or use --no-verify to bypass)." >&2
+  exit 1
+fi
