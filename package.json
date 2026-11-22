@@ -4,7 +4,11 @@
   "type": "module",
   "scripts": {
     "mock-llm": "node scripts/mock-llm.mjs",
-    "e2e:ui": "node scripts/ui-e2e.mjs"
+    "e2e:ui": "node scripts/ui-e2e.mjs",
+    "typecheck": "npm --prefix agent-ui run typecheck && npm --prefix widget run typecheck",
+    "test": "npm --prefix agent-ui test && npm --prefix widget test",
+    "check": "npm run typecheck && npm test",
+    "prepare": "git config core.hooksPath .githooks || exit 0"
   },
   "devDependencies": {
     "playwright-core": "^1.50.0"
