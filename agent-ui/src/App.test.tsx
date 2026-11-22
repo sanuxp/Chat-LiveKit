@@ -15,7 +15,6 @@ jest.mock("./api", () => ({
   },
 }));
 jest.mock("./useConversation", () => ({ useConversation: () => ({}) }));
-jest.mock("./VoiceSettings", () => ({ VoiceSettings: () => <h2>Voice settings</h2> }));
 
 beforeEach(() => {
   mockApi.mockResolvedValue({ conversations: [] });

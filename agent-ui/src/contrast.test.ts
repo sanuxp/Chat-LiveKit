@@ -19,10 +19,6 @@ const TEXT: [string, string, string][] = [
   ["AI summary label", "#b45309", "#fffbeb"],
   ["summary body text", "#4b5563", "#ffffff"],
   ["customer link", "#1d4ed8", "#f8fafc"],
-  ["voice settings saved message", "#15803d", "#ffffff"],
-  ["voice settings warning", "#b45309", "#ffffff"],
-  ["voice settings section heading", "#2563eb", "#ffffff"],
-  ["escalation reason", "#566070", "#fffbeb"],
 ];
 const NON_TEXT: [string, string, string][] = [
   ["input border", "#7a8496", "#ffffff"],
